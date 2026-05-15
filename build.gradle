@@ -1,5 +1,9 @@
+import org.springframework.cloud.contract.verifier.config.TestFramework
+import org.springframework.cloud.contract.verifier.config.TestMode
+
 plugins {
 	id 'java'
+	id 'jacoco'
 	id 'org.springframework.boot' version '4.0.6'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'org.springframework.cloud.contract' version '5.0.2'
@@ -19,56 +23,161 @@ repositories {
 }
 
 ext {
-	set('datasourceMicrometerVersion', "2.2.1")
+	set('micrometerVersion', "1.16.5")
 	set('springCloudVersion', "2025.1.1")
+	set('cucumberVersion', "7.34.3")
+}
+
+sourceSets {
+	cucumberTest {
+		java.srcDir 'src/cucumberTest/java'
+		resources.srcDir 'src/cucumberTest/resources'
+		compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+		runtimeClasspath += output + compileClasspath
+	}
 }
 
 dependencies {
+	// Core
+	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+	// Security, JWT and Secrets
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+	implementation 'org.springframework.cloud:spring-cloud-starter-vault-config'
+
+	// Data
 	implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
 	implementation 'org.springframework.boot:spring-boot-starter-flyway'
-	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-	implementation 'net.ttddyy.observation:datasource-micrometer-spring-boot'
 	implementation 'org.flywaydb:flyway-database-postgresql'
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
-	implementation 'org.springframework.cloud:spring-cloud-starter-vault-config'
-	compileOnly 'org.projectlombok:lombok'
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 	runtimeOnly 'org.postgresql:postgresql'
+
+	// Observability
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+
+	// API Docs
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+
+	// Dev
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
+
+	// Testing - Unit and Integration
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jdbc-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testCompileOnly 'org.projectlombok:lombok'
+	testAnnotationProcessor 'org.projectlombok:lombok'
+
+	// Testing - Test containers
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
-	testImplementation 'org.springframework.cloud:spring-cloud-starter-contract-verifier'
 	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 	testImplementation 'org.testcontainers:testcontainers-postgresql'
 	testImplementation 'org.testcontainers:testcontainers-vault'
-	testCompileOnly 'org.projectlombok:lombok'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-	testAnnotationProcessor 'org.projectlombok:lombok'
+
+
+	// Testing - Contracts
+	testImplementation 'org.springframework.cloud:spring-cloud-starter-contract-verifier'
+
+	// Testing - Behaviour
+	testImplementation "io.cucumber:cucumber-java"
+	testImplementation "io.cucumber:cucumber-spring"
+	testImplementation "io.cucumber:cucumber-junit-platform-engine"
+	cucumberTestImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
 dependencyManagement {
 	imports {
-		mavenBom "net.ttddyy.observation:datasource-micrometer-bom:${datasourceMicrometerVersion}"
+		mavenBom "io.micrometer:micrometer-bom:${micrometerVersion}"
 		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+		mavenBom "io.cucumber:cucumber-bom:${cucumberVersion}"
+	}
+}
+
+bootJar {
+	archiveFileName = 'api.jar'
+	manifest {
+		attributes 'Implementation-Title': 'Template API'
+		attributes 'Implementation-Version': project.version
+	}
+}
+
+jacoco {
+	toolVersion = '0.8.14'
+}
+
+jacocoTestReport {
+	dependsOn test
+	reports {
+		xml.required = true
+		html.required = true
+	}
+	afterEvaluate {
+		classDirectories.setFrom(files(classDirectories.files.collect {
+			fileTree(dir: it, excludes: [
+					'**/config/**',
+					'**/dto/**',
+					'**/*Application*'
+			])
+		}))
+	}
+}
+
+jacocoTestCoverageVerification {
+	violationRules {
+		rule {
+			limit {
+				// temporary, raise to 0.80 when ready
+				minimum = 0.0
+			}
+		}
 	}
 }
 
 contracts {
+	testFramework = TestFramework.JUNIT5
+	testMode = TestMode.MOCKMVC
+	baseClassForTests = 'com.template.contract.ContractBase'
+	packageWithBaseClasses = 'com.template.contract'
+	failOnNoContracts = false
 }
 
-tasks.named('contractTest') {
+tasks.withType(Test).configureEach {
+	jvmArgs '--enable-native-access=ALL-UNNAMED'
 	useJUnitPlatform()
 }
 
-tasks.named('test') {
+tasks.withType(JavaCompile).configureEach {
+	options.compilerArgs += ['--enable-preview']
+	options.fork = true
+}
+
+tasks.register('cucumberTest', Test) {
+	description = 'Runs Cucumber BDD tests'
+	group = 'verification'
+	testClassesDirs = sourceSets.cucumberTest.output.classesDirs
+	classpath = sourceSets.cucumberTest.runtimeClasspath
+	useJUnitPlatform()
+}
+
+tasks.named('check') {
+	dependsOn 'contractTest', 'cucumberTest', jacocoTestCoverageVerification
+}
+
+tasks.named('cucumberTest') {
+	mustRunAfter 'test'
+}
+
+tasks.named('contractTest') {
+	mustRunAfter 'cucumberTest'
 	useJUnitPlatform()
 }

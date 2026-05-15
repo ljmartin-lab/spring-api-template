@@ -1,0 +1,90 @@
+├── .github/workflows/
+│   └── ci.yml
+├── .gitlab-ci.yml
+├── docker/
+│   └── docker-compose.yml          # Postgres + Vault for local dev
+├── terraform/
+│   ├── modules/
+│   │   ├── vpc/
+│   │   ├── ec2/
+│   │   └── api-gateway/
+│   ├── main.tf
+│   ├── variables.tf
+│   └── outputs.tf
+├── src/
+│   ├── main/
+│   │   ├── java/com/yourorg/template/
+│   │   │   ├── config/
+│   │   │   │   ├── SecurityConfig.java
+│   │   │   │   ├── JwtConfig.java
+│   │   │   │   ├── OpenApiConfig.java
+│   │   │   │   └── VaultConfig.java
+│   │   │   ├── domain/
+│   │   │   │   ├── User.java           # JPA entity
+│   │   │   │   └── PasswordResetToken.java
+│   │   │   ├── repository/
+│   │   │   │   ├── UserRepository.java
+│   │   │   │   └── PasswordResetTokenRepository.java
+│   │   │   ├── service/
+│   │   │   │   ├── UserService.java
+│   │   │   │   ├── AuthService.java
+│   │   │   │   └── PasswordResetService.java
+│   │   │   ├── web/
+│   │   │   │   ├── controller/
+│   │   │   │   │   ├── AuthController.java
+│   │   │   │   │   └── UserController.java
+│   │   │   │   ├── dto/
+│   │   │   │   │   ├── RegisterRequest.java
+│   │   │   │   │   ├── LoginRequest.java
+│   │   │   │   │   ├── LoginResponse.java
+│   │   │   │   │   ├── UpdateUserRequest.java
+│   │   │   │   │   └── PasswordResetRequest.java
+│   │   │   │   └── mapper/
+│   │   │   │       └── UserMapper.java
+│   │   │   └── exception/
+│   │   │       ├── GlobalExceptionHandler.java
+│   │   │       └── ApiException.java
+│   │   └── resources/
+│   │       ├── db/migration/
+│   │       │   ├── V1__create_users_table.sql
+│   │       │   └── V2__create_password_reset_tokens_table.sql
+│   │       ├── application.yml
+│   │       ├── application-local.yml
+│   │       └── application-prod.yml
+│   └── test/
+│       ├── java/com/yourorg/template/
+│       │   ├── unit/
+│       │   │   ├── service/
+│       │   │   │   ├── UserServiceTest.java
+│       │   │   │   ├── AuthServiceTest.java
+│       │   │   │   └── PasswordResetServiceTest.java
+│       │   │   └── controller/
+│       │   │       ├── AuthControllerTest.java
+│       │   │       └── UserControllerTest.java
+│       │   ├── integration/
+│       │   │   └── UserRepositoryIntegrationTest.java
+│       │   ├── contract/
+│       │   │   └── AuthContractTest.java
+│       │   └── bdd/
+│       │       └── CucumberRunner.java
+│       └── resources/
+│           ├── contracts/
+│           │   └── auth/
+│           │       └── shouldRegisterUser.groovy
+│           └── features/
+│               ├── auth/
+│               │   ├── register.feature
+│               │   └── login.feature
+│               └── users/
+│                   └── manage_user.feature
+├── Dockerfile
+├── build.gradle
+└── settings.gradle
+
+
+docker exec -it template-api-postgres psql -U template_user -d template_api
+
+# Then inside psql:
+\dt                          -- list all tables
+SELECT * FROM flyway_schema_history;   -- confirm all 4 migrations applied
+\d users                     -- inspect users table structure
