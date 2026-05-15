@@ -20,3 +20,5 @@ services:
 volumes:
   postgres_data:
     driver: local
+
+# TOOD: need to add vault here
